@@ -14,19 +14,19 @@ description: 会話中に得た新しい知識、指摘事項、運用上の学�
 
 ## 対象
 
-- `/home/kamiy2743/workspace/.skills/raspi-dev`
-- `/home/kamiy2743/workspace/.skills/go-impl`
+- `/workspace/ai/skills/{raspi-dev,go-impl,update-raspi-dev}`
+- ホスト側では `/home/kamiy2743/workspace/ai/skills/...` に対応する。
 
 ## 基本方針
 
 - まず現在の `raspi-dev` を読む。
+- コンテナ前提やホストパスの読み替えは `raspi-dev` の共通コンテキストに集約する。
 - Go 実装の責務分割、package 構成、handler / infra / domain の書き方のような汎用ルールは、`raspi-dev` ではなく `go-impl` を優先して更新する。
 - 反映候補は、この会話で得た知識のうち、再利用価値があり、比較的安定しているものに限る。
 - 一時的な観測結果、単発のログ断片、今だけの値は原則として入れない。
 - 同じ意味の記述が既にある場合は追記せず、既存の記述を短く正確に書き換える。
 - 共通事項は `SKILL.md`、プロジェクト固有の内容は `references/<project>/overview.md` に入れる。
 - `go-impl` でも、メインの `SKILL.md` は薄く保ち、package ごとの詳細は `references/` に寄せる。
-- workspace 側の skill を追加・更新した結果を Codex に認識させたい場合は、`/home/kamiy2743/.codex/skills/` の symlink も確認する。
 - 同じ内容を複数ファイルへ重複記載しない。
 - 手順や確認コマンドは、恒常的に必要でない限り入れない。
 - 長い経緯説明より、判断に必要な結論だけを残す。
@@ -42,8 +42,8 @@ description: 会話中に得た新しい知識、指摘事項、運用上の学�
 4. 既存記述と重なる箇所を探す。
 5. 追記ではなく、可能なら既存記述を短く統合して置き換える。
 6. 不要になった重複や冗長表現を削る。
-7. 必要なら `/home/kamiy2743/.codex/skills/` に対応する symlink があるか確認し、無ければ追加する。
-8. 更新後に、`raspi-dev` と `go-impl` が前より長くなりすぎていないか確認する。
+7. `/home/codex/.codex/skills/` 側からも同じ内容として見えるか確認する。
+8. 更新後に、`raspi-dev`, `go-impl`, `update-raspi-dev` が前より長くなりすぎていないか確認する。
 
 ## 何を入れるか
 

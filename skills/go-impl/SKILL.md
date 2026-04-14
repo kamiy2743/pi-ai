@@ -13,9 +13,10 @@ description: Go で internal 配下を domain, infra, handler, middleware, confi
 ## 使い方
 
 1. Go のルートディレクトリを特定する。
-2. まず [references/overview.md](references/overview.md) を読む。
-3. 触る package に対応する reference だけ追加で読む。
-4. reference を前提にしつつ、実装前に既存コードを必ず確認する。
+2. Raspberry Pi workspace では `raspi-dev` のコンテナ前提に従う。
+3. まず [references/overview.md](references/overview.md) を読む。
+4. 触る package に対応する reference だけ追加で読む。
+5. reference を前提にしつつ、実装前に既存コードを必ず確認する。
 
 ## 読み分け
 
