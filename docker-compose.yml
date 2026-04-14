@@ -16,10 +16,10 @@ services:
     tmpfs:
       - /tmp/
     volumes:
-      - ../:/workspace:rw
+      - ../:/workspace/:rw
       - codex-home:/home/codex/.codex/
       - codex-cache:/home/codex/.cache/
-      - ./skills:/home/codex/.codex/skills:rw
+      - ./skills/:/home/codex/.codex/skills/:rw
     restart: unless-stopped
 
 volumes:
