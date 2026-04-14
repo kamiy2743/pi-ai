@@ -13,15 +13,17 @@ description: Raspberry Pi 上の /home/kamiy2743/workspace で作業するとき
 ## 共通コンテキスト
 
 - この環境は Raspberry Pi 5 上で動いている。
+- Codex は Docker コンテナ内で動いており、コマンド実行やファイル参照は基本的にコンテナ内から行う。
+- ユーザーが指定する `/home/kamiy2743/workspace/<project>` はホスト側パスで、コンテナ内では通常 `/workspace/<project>` として見える。
+- 指定パスがコンテナ内に存在しない場合は、まず `/workspace` 側の対応パスを確認する。
+- ホスト側の Docker 構成、systemd、ufw、実機デバイスなどを操作・確認する話では、コンテナ内で見える情報とホスト実体が異なる可能性を前提にする。
 - ユーザーは学習目的で Raspberry Pi 上の開発とサーバー運用をしている。
 - ユーザーは同一 LAN 内の Windows マシンから SSH で接続して作業している。
 - Windows から Pi 上の localhost 向け開発サービスを見るときは、SSH トンネルを使う運用になっている。
 - ホスト名は `kamiy2743`、mDNS 名は `kamiy2743-2.local`。
 - 保有ドメインは `panda-dev.net`。
 - SSH は公開鍵認証を使っている。
-- `fail2ban` は導入済み。
 - `ufw` は有効で、現時点では `22/tcp` を `192.168.0.0/24` からのみ許可している。
-- この実行環境では Go の PATH が通っていないことがあるため、Go コマンドは `/usr/local/go/bin/go` の絶対パスで使う。
 - 公開系プロジェクトの compose では、Cloudflare Tunnel token や Basic Auth などの機密値は `.env` ではなく `secrets/` 配下の Docker secrets で管理する運用になっている。
 - 返答は日本語で行う。
 - 説明では、可能な限り手順、コマンド、確認方法を示す。
@@ -35,6 +37,7 @@ description: Raspberry Pi 上の /home/kamiy2743/workspace で作業するとき
 
 ## Project References
 
+- `ai`: `references/ai/overview.md`
 - `blog`: `references/blog/overview.md`
 - `cloudflare`: `references/cloudflare/overview.md`
 - `health-check`: `references/health-check/overview.md`

@@ -1,0 +1,9 @@
+sandbox_mode = "danger-full-access"
+
+approvals_reviewer = "user"
+
+[projects."/workspace"]
+trust_level = "trusted"
+
+[plugins."github@openai-curated"]
+enabled = true
