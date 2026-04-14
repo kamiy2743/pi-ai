@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_path="$(readlink -f "$0")"
+cd "$(dirname "$script_path")"
+
+docker compose up -d
+exec docker compose exec codex codex "$@"

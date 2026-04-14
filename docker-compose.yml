@@ -1,0 +1,26 @@
+services:
+  codex:
+    build:
+      context: ./
+      args:
+        HOST_UID: ${HOST_UID}
+        HOST_GID: ${HOST_GID}
+        CODEX_VERSION: ${CODEX_VERSION}
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp/
+    volumes:
+      - ../:/workspace:rw
+      - codex-home:/home/codex/.codex/
+      - codex-cache:/home/codex/.cache/
+    restart: unless-stopped
+
+volumes:
+  codex-home:
+  codex-cache:
