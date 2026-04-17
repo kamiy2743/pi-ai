@@ -33,7 +33,7 @@
 - `prd` の `nginx` は `/dist/client/` を直接返し、それ以外を `go` へ proxy する
 - `frontend/public/` の静的ファイルは dev では Vite dev server がルート直下 `/...` で返し、prd では client build 後に `/dist/client/...` として nginx から返す
 - `backend/cmd/` は `app`, `migration`, `seed` に分かれ、通常起動と DB 操作を分離している
-- `ent` の schema と生成コードは `backend/internal/ent/` に置き、`./blog ent generate` はここを対象にする
+- `ent` の schema と生成コードは `backend/internal/db/ent/` に置き、`./blog ent generate` はここを対象にする
 - `./blog` には `up|down|restart|recreate` に加えて `mysql`, `migrate`, `seed`, `ent generate`, `back fmt`, `back test <backend package path>` があり、基本操作はこのラッパ経由で行う
 - `./blog back test` は Go package 単位の実行を前提とし、`backend/internal/.../show` のようなディレクトリや package path を渡す。`*_test.go` のファイル指定は受けない
 - `./blog back test backend/internal/handler/...` のように `...` で配下 package を再帰実行できる。`mysql-test` を共有するため、ラッパ側では package 並列実行を避ける `go test -p 1` を使う
@@ -54,7 +54,7 @@
 - `backend/internal/config/`: backend の env / Docker secrets 読み取り
 - `backend/internal/db/`: MySQL / ent client の接続処理
 - `backend/internal/domain/`: `article`, `category` などの domain 型
-- `backend/internal/ent/`: ent schema と生成コード
+- `backend/internal/db/ent/`: ent schema と生成コード
 - `backend/internal/handler/`: handler 群。例: `admin/article/create/`, `article/search/`, `top/show/`
 - handler 実装の参考: `top/show` はトップ画面、`article/search` は initial / partialSearch と検索・ページング、`article/show` は path ID からの詳細表示、`admin/show` は Basic Auth 配下の管理用検索・ページング
 - `backend/internal/infra/category/`: カテゴリ repository。top 画面のカテゴリ一覧取得元
