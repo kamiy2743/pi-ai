@@ -17,21 +17,18 @@
 - 単純な health check のように責務が 1 つなら 1 ファイルでもよい。
 - notfound のように repository access がなく、props 変換もほぼ不要な画面は `Handler` 単体でもよい。
 
-## `top/show` を基準にした分割
+## 画面 handler の基準
 
-- 画面表示系 handler の再実装は、`internal/handler/feature/top/show/` 一式を基準に考える。
-- 基準にするのは `show_top_handler.go` 単体ではなく、次の 4 ファイルの責務分割。
-  - `show_top_handler.go`
-  - `show_top_usecase.go`
-  - `show_top_result.go`
-  - `show_top_formatter.go`
-- まず `top/show` と同じ責務境界を置き、そのうえで不要な層だけ省く。
+- 画面表示系 handler は、既存の `top/show`, `article/search`, `article/show`, `admin/show` の責務分割を基準にする。
+- 基本は `*_handler.go`, `*_usecase.go`, `*_formatter.go` に分ける。query parse がある画面は `*_request.go` も置く。
+- result struct は小さいなら `*_usecase.go` に置いてよい。formatter の入力を安定させるため、handler で props を組み立てない。
 
 - `Handler`
   - HTTP の入口
-  - `usecase.Run(ctx)` の呼び出し
-  - error を HTTP status に変換
-  - `Render(..., Format(result))` の呼び出し
+  - path/query parse と validation
+  - usecase の呼び出し
+  - error を Inertia error response に変換
+  - `inertia.Render(..., format(result))` の呼び出し
 - `Usecase`
   - repository interface の呼び出し
   - query criteria や order の決定
@@ -50,10 +47,12 @@
 - 公開入口は `Handle(w, r)` に揃える。
 - route から直接 package 関数を呼ばず、`internal/di/container.go` で `NewHandler(...)` した instance を使う。
 - `Handle` の中では次だけを行う。
-  - `result, err := h.usecase.Run(r.Context())`
-  - error 時の `http.Error(...)`
-  - 成功時の `h.inertia.Render(w, r, "<PageName>", Format(result))`
+  - request parse / validation
+  - `h.usecase.run...(ctx, input)` の呼び出し
+  - `inertia.RenderError(...)` または `inertia.Render(...)`
 - handler に repository 呼び出し、検索条件の分岐、props の map 組み立てを持ち込まない。
+- query validation がある画面は `inertia.PrepareInput(w, r, inertiaApp, toInput)` を使い、`toInput` と parse helper は `*_request.go` に置く。
+- Inertia の lazy props を使う画面は、handler で `gonertia.Props{"initial": func(ctx), "partialSearch": func(ctx)}` のように分ける。
 - notfound のようにロジックが薄い画面は `Handler` 単体で十分なことがある。
 - その場合でも、既存 project が `Handler` struct と `container` 経由で揃えているなら、その流儀に合わせる。
 - `RenderWithStatus` を使う画面でも、可能なら `Handle(w, r)` を持つ `Handler` struct に閉じ込める。
@@ -62,7 +61,7 @@
 
 - `Usecase` は必要な repository interface を field に持つ struct にする。
 - 依存先は domain の repository interface に限定する。
-- `Run(ctx)` は feature の取得条件を明示して、result struct を返す。
+- `run(ctx)` / `runPartialSearch(ctx, input)` など action に合う入口を置き、feature の取得条件を明示して result struct を返す。
 - top page 相当なら次の流れにする。
   - `articleRepository.Search(ctx, article.SearchArticleCriteria{Limit: 10, OrderBy: article.OrderByLatest})`
   - `categoryRepository.All(ctx, category.OrderByNameAsc)`
@@ -93,11 +92,13 @@ type ShowTopResult struct {
   - frontend が必要な key 名に詰め替える
 - formatter で repository access や validation をしない。
 - domain object をそのまま view に晒さず、props で必要な形に落とし切る。
+- 一覧・検索画面は `formatInitial` と `formatPartialSearch` のように props 単位で分ける。
+- 詳細画面やトップ画面は `format(result)` でまとめてよい。
 
 ## 実装順
 
-1. `*_result.go` で result struct を定義する。
-2. `*_usecase.go` で repository interface を受け取る `Usecase` と `Run(ctx)` を書く。
+1. `*_usecase.go` で result/input struct と repository interface を受け取る `Usecase` を書く。
+2. query がある画面は `*_request.go` で request parse / validation を書く。
 3. `*_formatter.go` で result から props への変換を書く。
 4. `*_handler.go` で `Handle(w, r)` を書く。
 5. `internal/di/container.go` で `NewUsecase(...)` と `NewHandler(...)` をつなぐ。
@@ -208,7 +209,9 @@ func Format(result ShowTopResult) gonertia.Props {
 ## 注意点
 
 - path/query の parse は handler 境界で済ませ、domain には型付きで渡す。
+- 検索画面では、query の文字列 parse と validation は request、カテゴリIDの正規化や page/perPage の検索条件化は usecase に寄せる。
 - not found と validation error と internal error の扱いを既存 route と揃える。
+- not found を表すためだけに repository に `Find` を足さず、既存の `Search` / `Paginate` で条件取得できるならそちらを使う。
 - handler が肥大化したら、まず usecase か formatter に責務を逃がす。
 - formatter が複雑になっても、repository 呼び出しや domain mutation は入れない。
 

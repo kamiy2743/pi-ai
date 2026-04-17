@@ -36,9 +36,11 @@
 - `ent` の schema と生成コードは `backend/internal/ent/` に置き、`./blog ent generate` はここを対象にする
 - `./blog` には `up|down|restart|recreate` に加えて `mysql`, `migrate`, `seed`, `ent generate`, `back fmt`, `back test <backend package path>` があり、基本操作はこのラッパ経由で行う
 - `./blog back test` は Go package 単位の実行を前提とし、`backend/internal/.../show` のようなディレクトリや package path を渡す。`*_test.go` のファイル指定は受けない
+- `./blog back test backend/internal/handler/...` のように `...` で配下 package を再帰実行できる。`mysql-test` を共有するため、ラッパ側では package 並列実行を避ける `go test -p 1` を使う
 - `dev` には常駐の `go-test` service があり、`./blog back test` は `go-test` へ `docker compose exec` して実行する。初回は module / build cache を作るが、2 回目以降は cache が効く
 - `go-test` は `backend/.env.test` を使い、`mysql-test` へ `mysql-test:3306` で接続する。`mysql-test` は host 公開せず `private` network 内だけで使う
 - `backend/internal/test/helper/RequestInertia` は Inertia page object の JSON を返す正常系レスポンス向けで、plain text の `500` や redirect 検証には向かない。`InertiaResponse.AssertProps` は `200 OK` を内部で固定し、component と props の検証に使う
+- admin 配下の Inertia test は `RequestInertia` に `UseBasicAuth: true` を渡し、Basic Auth の値は helper 側で config から読む
 - `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する
 - `./blog` は project 名に `blog-dev`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
@@ -54,6 +56,7 @@
 - `backend/internal/domain/`: `article`, `category` などの domain 型
 - `backend/internal/ent/`: ent schema と生成コード
 - `backend/internal/handler/`: handler 群。例: `admin/article/create/`, `article/search/`, `top/show/`
+- handler 実装の参考: `top/show` はトップ画面、`article/search` は initial / partialSearch と検索・ページング、`article/show` は path ID からの詳細表示、`admin/show` は Basic Auth 配下の管理用検索・ページング
 - `backend/internal/infra/category/`: カテゴリ repository。top 画面のカテゴリ一覧取得元
 - `backend/internal/seed/`: 開発用 seed 実装
 - `backend/internal/test/`: backend integration test 用 helper と fixture
