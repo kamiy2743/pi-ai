@@ -8,7 +8,8 @@
 
 - `docker-compose.yml` は `codex` サービスを定義し、`sleep infinity` で常駐させる。
 - `Dockerfile` は Debian bookworm-slim ベースで、`bubblewrap`, `curl`, `git`, `openssh-client`, `ripgrep` を入れ、OpenAI Codex の Linux aarch64 musl 版を GitHub Releases から取得する。
-- `codex` は `docker compose exec codex codex "$@"` を実行する薄いラッパースクリプト。
+- `codex` は `docker compose exec codex` で Codex を起動するラッパースクリプト。
+- `codex` は起動直後に `/home/codex/.codex/log/codex-tui.log` へ出る `thread_id` を監視し、検出したセッションIDを `/proc/1/fd/1` へ書いてコンテナログへ出す。
 - `config.toml` は Codex 設定で、`/workspace` を trusted project とし、GitHub curated plugin を有効化している。
 - `skills/` は `/home/codex/.codex/skills/` に rw マウントされる。
 

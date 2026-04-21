@@ -5,4 +5,4 @@ set -euo pipefail
 script_path="$(readlink -f "$0")"
 cd "$(dirname "$script_path")"
 
-exec docker compose exec codex codex "$@"
+exec docker compose exec codex /workspace/ai/codex-entrypoint "$@"
