@@ -53,6 +53,7 @@
 - handler に repository 呼び出し、検索条件の分岐、props の map 組み立てを持ち込まない。
 - query validation がある画面は `inertia.PrepareInput(w, r, inertiaApp, toInput)` を使い、`toInput` と parse helper は `*_request.go` に置く。
 - Inertia の lazy props を使う画面は、handler で `gonertia.Props{"initial": func(ctx), "partialSearch": func(ctx)}` のように分ける。
+- `initial` は partial reload する画面でだけ使う。partial reload しない画面は `format(result) gonertia.Props` で props を直に返す。
 - notfound のようにロジックが薄い画面は `Handler` 単体で十分なことがある。
 - その場合でも、既存 project が `Handler` struct と `container` 経由で揃えているなら、その流儀に合わせる。
 - `RenderWithStatus` を使う画面でも、可能なら `Handle(w, r)` を持つ `Handler` struct に閉じ込める。
@@ -62,6 +63,7 @@
 - `Usecase` は必要な repository interface を field に持つ struct にする。
 - 依存先は domain の repository interface に限定する。
 - `run(ctx)` / `runPartialSearch(ctx, input)` など action に合う入口を置き、feature の取得条件を明示して result struct を返す。
+- POST などの mutation でも、handler は request parse / response に留め、repository 呼び出しや対象存在確認は usecase に置く。
 - top page 相当なら次の流れにする。
   - `articleRepository.Search(ctx, article.SearchArticleCriteria{Limit: 10, OrderBy: article.OrderByLatest})`
   - `categoryRepository.All(ctx, category.OrderByNameAsc)`
@@ -93,6 +95,7 @@ type ShowTopResult struct {
 - formatter で repository access や validation をしない。
 - domain object をそのまま view に晒さず、props で必要な形に落とし切る。
 - 一覧・検索画面は `formatInitial` と `formatPartialSearch` のように props 単位で分ける。
+- `formatInitial` は partial reload 用の props 分割が必要な場合だけ使う。
 - 詳細画面やトップ画面は `format(result)` でまとめてよい。
 
 ## 実装順
@@ -177,13 +180,13 @@ func (u *Usecase) Run(ctx context.Context) (ShowTopResult, error) {
 
 ```go
 func Format(result ShowTopResult) gonertia.Props {
-	latestArticles := make([]map[string]any, 0, len(result.LatestArticles))
+	latestArticles := make(gonertia.props, 0, len(result.LatestArticles))
 	for _, article := range result.LatestArticles {
 		categoryNames := make([]string, 0, len(article.Categories))
 		for _, category := range article.Categories {
 			categoryNames = append(categoryNames, category.Name)
 		}
-		latestArticles = append(latestArticles, map[string]any{
+		latestArticles = append(latestArticles, gonertia.props{
 			"id":            article.ID,
 			"title":         article.Title,
 			"date":          article.UpdatedAt.Format(time.RFC3339),
@@ -191,9 +194,9 @@ func Format(result ShowTopResult) gonertia.Props {
 		})
 	}
 
-	categories := make([]map[string]any, 0, len(result.Categories))
+	categories := make(gonertia.props, 0, len(result.Categories))
 	for _, category := range result.Categories {
-		categories = append(categories, map[string]any{
+		categories = append(categories, gonertia.props{
 			"id":   category.ID,
 			"name": category.Name,
 		})
@@ -220,5 +223,5 @@ func Format(result ShowTopResult) gonertia.Props {
 - integration test では、HTTP サーバー初期化と DB 初期化は `internal/test/` に寄せ、個別 test は seed と期待値に集中させる。
 - Inertia の画面 test では、共通の request helper と response helper を `internal/test/helper/` に置き、各 test で request 構築や JSON decode を繰り返さない。
 - Inertia response の検証は、status code / component / props をまとめて検証する helper か method に寄せる。
-- props 全体を struct 化しにくい場合は、typed struct より JSON 比較や `map[string]any` 比較を優先してよい。
+- props 全体を struct 化しにくい場合は、typed struct より JSON 比較や `gonertia.props` 比較を優先してよい。
 - fixture は `internal/test/fixture/<entity>/` に置き、位置引数が増えるなら入力 struct を定義して可読性を保つ。

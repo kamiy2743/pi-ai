@@ -23,10 +23,13 @@
 - `cloudflared` は `blog.panda-dev.net` を `http://nginx:8000` に転送する
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_ROOT_TEMPLATE` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
+- Inertia 向け handler は feature handler が `handlerresult.HandlerResult` と `*handlererror.DisplayableError` を返し、HTTP response への変換は `handler.InertiaPage` / `handler.InertiaAction` adapter 側に寄せる方針
+- Inertia page の共通 props 名は `validationErrors` と `flash` を使う
 - top 画面のカテゴリ一覧は記事から抽出せず、`category.Repository` の `All` で全カテゴリを取得する
 - backend から frontend へ渡す日時は表示用に整形せず、ISO 8601 文字列で渡して frontend 側で整形する方針
 - `go` 側は末尾 `/` を middleware で除去して canonical URL に寄せる前提なので、`/article` と `/article/` のような二重定義は不要
 - `/admin` 配下は Go 側で Basic Auth を要求し、その資格情報は `/run/secrets/admin_basic_auth_*` から読む。公開時は Cloudflare Access と合わせて二段で保護する前提
+- 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
 - `dev` / `prd` の compose は `secrets/dev/`, `secrets/prd/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
 - `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、Vite の asset/HMR を `vite-dev:5173` へ、その他を `go` へ proxy する
 - `dev` を Windows から確認するときは、上の localhost bind と SSH トンネル利用が前提になる
