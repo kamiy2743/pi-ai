@@ -10,18 +10,18 @@
 ## ディレクトリ構成
 
 - `backend/`: Go アプリケーション
-- `frontend/`: Svelte + Inertia のフロントエンドと SSR
+- `frontend/`: Svelte + Inertia のフロントエンドと SSR。`server/` に dev 用 Vite サーバーと本番 SSR サーバーを置く
 - `nginx/`: reverse proxy と静的アセット配信
 - `cloudflared/`: Tunnel の ingress 設定
 - `secrets/`: `dev/`, `prd/` ごとの Docker secrets
-- `docker-compose.dev.yml`: 開発用の `nginx`, `go`, `mysql`, `vite-dev`, `ssr`
+- `docker-compose.dev.yml`: 開発用の `nginx`, `go`, `go-test`, `mysql`, `mysql-test`, `vite-dev`
 - `docker-compose.prd.yml`: 本番用の `nginx`, `go`, `mysql`, `ssr`, `cloudflared`
 - `blog`: `./blog {dev|prd} ...` で `docker compose -p blog-{env}` を呼ぶラッパ。基本的な操作は `docker compose` を直接叩かず、原則 `./blog` 経由で行う
 
 ## 実行時のポイント
 
 - `cloudflared` は `blog.panda-dev.net` を `http://nginx:8000` に転送する
-- `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_ROOT_TEMPLATE` などを前提に Inertia SSR を使う
+- `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
 - Inertia 向け handler は feature handler が `handlerresult.HandlerResult` と `*handlererror.DisplayableError` を返し、HTTP response への変換は `handler.InertiaPage` / `handler.InertiaAction` adapter 側に寄せる方針
 - Inertia page の共通 props 名は `validationErrors` と `flash` を使う
@@ -31,10 +31,13 @@
 - `/admin` 配下は Go 側で Basic Auth を要求し、その資格情報は `/run/secrets/admin_basic_auth_*` から読む。公開時は Cloudflare Access と合わせて二段で保護する前提
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
 - `dev` / `prd` の compose は `secrets/dev/`, `secrets/prd/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
-- `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、Vite の asset/HMR を `vite-dev:5173` へ、その他を `go` へ proxy する
+- `dev` では `SSR_URL=http://vite-dev:5173` を使い、`vite-dev` のカスタム Node サーバーが Vite middleware と `/render` を兼ねる。開発用の別 `ssr` service は使わない
+- `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、`/error`, Vite の module/HMR/fallback favicon だけを `vite-dev:5173` へ、画面本体と API は `go` へ proxy する
 - `dev` を Windows から確認するときは、上の localhost bind と SSH トンネル利用が前提になる
 - `prd` の `nginx` は `/dist/client/` を直接返し、それ以外を `go` へ proxy する
+- `prd` の `ssr` は `frontend/Dockerfile.ssr` から起動し、`frontend/server/ssr-server.ts` が `/render` と `/health` を返す
 - `frontend/public/` の静的ファイルは dev では Vite dev server がルート直下 `/...` で返し、prd では client build 後に `/dist/client/...` として nginx から返す
+- `nginx/snippets/header.conf` に CSP の共通形を置き、`dev.conf` / `prd.conf` では `set $csp_connect_src ...` で `connect-src` だけ出し分ける。dev は HMR 用に `ws://localhost:8000` を許可する
 - `backend/cmd/` は `app`, `migration`, `seed` に分かれ、通常起動と DB 操作を分離している
 - `ent` の schema と生成コードは `backend/internal/db/ent/` に置き、`./blog ent generate` はここを対象にする
 - `./blog` には `up|down|restart|recreate` に加えて `mysql`, `migrate`, `seed`, `ent generate`, `back fmt`, `back test <backend package path>` があり、基本操作はこのラッパ経由で行う
@@ -72,11 +75,14 @@
 - `nginx/dev.conf`: 開発 nginx 設定
 - `nginx/prd.conf`: 本番 nginx 設定
 - `nginx/snippets/upstream.conf`: `go` upstream 定義
+- `nginx/snippets/header.conf`: 共通セキュリティヘッダーと CSP テンプレート
 - `frontend/vite.config.vite-dev.js`: Vite dev server 設定
 - `frontend/vite.config.client.js`: client build 設定
 - `frontend/vite.config.ssr.js`: SSR build 設定
-- `frontend/Dockerfile.ssr.dev`: 開発 SSR コンテナ
-- `frontend/Dockerfile.ssr.prd`: 本番 SSR コンテナ
+- `frontend/Dockerfile.ssr`: 本番 SSR コンテナ用の共通 Dockerfile
+- `frontend/server/dev-server.mjs`: dev 用の Vite + SSR エントリポイント
+- `frontend/server/render.ts`: dev / prd 共通の Inertia SSR 描画処理
+- `frontend/server/ssr-server.ts`: 本番 SSR サーバー
 - `cloudflared/config.yml`: Tunnel ingress 設定
 
 ## 現状メモ
