@@ -14,7 +14,7 @@ description: Raspberry Pi 上の /home/kamiy2743/workspace で作業するとき
 
 - この環境は Raspberry Pi 5 上で動いている。
 - Codex は Docker コンテナ内で動いており、ユーザー指定の `/home/kamiy2743/workspace/<project>` は通常 `/workspace/<project>` として見える。
-- 指定パスが存在しない場合は、まず `/workspace` 側の対応パスを確認する。
+- 指定パスが存在しない場合は、まず `/workspace` 側の対応パスを確認する。ローカル画像パスやスクリーンショットでも同様に `/home/kamiy2743/workspace/...` を `/workspace/...` へ読み替えて確認する。
 - ホスト側の Docker 構成、systemd、ufw、実機デバイスなどを操作・確認する話では、コンテナ内で見える情報とホスト実体が異なる可能性を前提にする。
 - ユーザーは学習目的で Raspberry Pi 上の開発とサーバー運用をしている。
 - ユーザーは同一 LAN 内の Windows マシンから SSH で接続して作業している。
