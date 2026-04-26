@@ -23,8 +23,10 @@
 - `cloudflared` は `blog.panda-dev.net` を `http://nginx:8000` に転送する
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
-- Inertia 向け handler は feature handler が `handlerresult.HandlerResult` と `*handlererror.DisplayableError` を返し、HTTP response への変換は `handler.InertiaPage` / `handler.InertiaAction` adapter 側に寄せる方針
+- Inertia 向け handler は adapter 経由で HTTP response へ変換する。page handler は `handlerresult.PageResult, error`、action handler は `handlerresult.ActionResult, error` を返す
 - Inertia page の共通 props 名は `validationErrors` と `flash` を使う
+- `ValidationError` は `field -> message` の `Messages map[string]string` を持つ error として扱い、page はそのまま返し、action は session 経由で redirect back 後に表示する
+- `backend/internal/handler/session.SessionPayload` は `ValidationError *handlererror.ValidationError` と `Flash *session.Flash` を持つ
 - top 画面のカテゴリ一覧は記事から抽出せず、`category.Repository` の `All` で全カテゴリを取得する
 - backend から frontend へ渡す日時は表示用に整形せず、ISO 8601 文字列で渡して frontend 側で整形する方針
 - `go` 側は末尾 `/` を middleware で除去して canonical URL に寄せる前提なので、`/article` と `/article/` のような二重定義は不要
@@ -62,7 +64,7 @@
 - `backend/internal/domain/`: `article`, `category` などの domain 型
 - `backend/internal/db/ent/`: ent schema と生成コード
 - `backend/internal/handler/`: handler 群。例: `admin/article/create/`, `article/search/`, `top/show/`
-- handler 実装の参考: `top/show` はトップ画面、`article/search` は initial / partialSearch と検索・ページング、`article/show` は path ID からの詳細表示、`admin/show` は Basic Auth 配下の管理用検索・ページング
+- handler 実装の参考: `top/show` はトップ画面、`article/search` と `admin/show` は initial / partialSearch を持つ検索・ページング、`article/show` は path ID からの詳細表示
 - `backend/internal/infra/category/`: カテゴリ repository。top 画面のカテゴリ一覧取得元
 - `backend/internal/seed/`: 開発用 seed 実装
 - `backend/internal/test/`: backend integration test 用 helper と fixture

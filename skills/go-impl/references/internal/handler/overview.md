@@ -5,6 +5,7 @@
 - HTTP request を受けて response を返す。
 - feature ごとの画面・API の振る舞いを `handler/<feature>/<action>/` に閉じ込める。
 - 複雑な処理は `Handler`, `Usecase`, `Result`, `Formatter` に分ける。
+- Inertia 向けの HTTP response 変換は adapter に寄せ、feature handler では page / action の結果だけを返す。
 
 ## ディレクトリ構成
 
@@ -27,8 +28,7 @@
   - HTTP の入口
   - path/query parse と validation
   - usecase の呼び出し
-  - error を Inertia error response に変換
-  - `inertia.Render(..., format(result))` の呼び出し
+  - page/action の result と error の返却
 - `Usecase`
   - repository interface の呼び出し
   - query criteria や order の決定
@@ -42,21 +42,35 @@
 
 ## Handler の書き方
 
-- `type Handler struct { inertia *gonertia.Inertia; usecase *Usecase }` を基本形にする。
-- `NewHandler(inertiaApp, usecase)` で依存を受け取る。
-- 公開入口は `Handle(w, r)` に揃える。
+- feature handler は `type Handler struct { usecase *Usecase }` を基本形にする。
+- `NewHandler(usecase)` で依存を受け取る。
+- 公開入口は `Handle(r)` に揃える。
 - route から直接 package 関数を呼ばず、`internal/di/container.go` で `NewHandler(...)` した instance を使う。
 - `Handle` の中では次だけを行う。
   - request parse / validation
   - `h.usecase.run...(ctx, input)` の呼び出し
-  - `inertia.RenderError(...)` または `inertia.Render(...)`
+  - `handlerresult.Page(...)` または `handlerresult.Redirect(...)` と `error` の返却
 - handler に repository 呼び出し、検索条件の分岐、props の map 組み立てを持ち込まない。
-- query validation がある画面は `inertia.PrepareInput(w, r, inertiaApp, toInput)` を使い、`toInput` と parse helper は `*_request.go` に置く。
-- Inertia の lazy props を使う画面は、handler で `gonertia.Props{"initial": func(ctx), "partialSearch": func(ctx)}` のように分ける。
+- query validation がある画面は `toInput` と parse helper を `*_request.go` に置く。
+- query validation は `*handlererror.ValidationError` を返し、page handler は最後にそのまま `error` として返す。
+- Inertia の lazy props を使う画面でも、props 自体は handler で `gonertia.Props` を組み立て、partial reload の分岐だけを持つ。
 - `initial` は partial reload する画面でだけ使う。partial reload しない画面は `format(result) gonertia.Props` で props を直に返す。
 - notfound のようにロジックが薄い画面は `Handler` 単体で十分なことがある。
 - その場合でも、既存 project が `Handler` struct と `container` 経由で揃えているなら、その流儀に合わせる。
-- `RenderWithStatus` を使う画面でも、可能なら `Handle(w, r)` を持つ `Handler` struct に閉じ込める。
+- `RenderWithStatus` を使う画面でも、可能なら adapter の外へ `http.ResponseWriter` を漏らさない。
+
+## Adapter の基準
+
+- page 用 adapter は `func(*http.Request) (handlerresult.PageResult, error)` を受ける。
+- action 用 adapter は `func(*http.Request) (handlerresult.ActionResult, error)` を受ける。
+- `HandlerResult` のような共通 interface は置かず、page/action で返り値型を分ける。
+- adapter が行うのは次に限る。
+  - `PageResult` から Inertia render
+  - `ActionResult.RedirectTo` から redirect
+  - `ValidationError` / `DisplayableError` の解釈
+  - session の flash / validation error の保存と復元
+- action の validation error は adapter が session に保存して redirect back する。
+- page の validation error は adapter が `validationErrors` props に載せて通常の page render に流す。
 
 ## Usecase の書き方
 
@@ -121,23 +135,19 @@ type ShowTopResult struct {
 
 ```go
 type Handler struct {
-	inertia *gonertia.Inertia
 	usecase *Usecase
 }
 
-func NewHandler(i *gonertia.Inertia, u *Usecase) *Handler {
-	return &Handler{inertia: i, usecase: u}
+func NewHandler(u *Usecase) *Handler {
+	return &Handler{usecase: u}
 }
 
-func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Handle(r *http.Request) (handlerresult.PageResult, error) {
 	result, err := h.usecase.Run(r.Context())
 	if err != nil {
-		http.Error(w, "取得エラー", http.StatusInternalServerError)
-		return
+		return handlerresult.PageResult{}, err
 	}
-	if err := h.inertia.Render(w, r, "PageName", Format(result)); err != nil {
-		http.Error(w, "描画エラー", http.StatusInternalServerError)
-	}
+	return handlerresult.Page("PageName", Format(result)), nil
 }
 ```
 
@@ -214,6 +224,8 @@ func Format(result ShowTopResult) gonertia.Props {
 - path/query の parse は handler 境界で済ませ、domain には型付きで渡す。
 - 検索画面では、query の文字列 parse と validation は request、カテゴリIDの正規化や page/perPage の検索条件化は usecase に寄せる。
 - not found と validation error と internal error の扱いを既存 route と揃える。
+- `ValidationError` は例外扱いではなく通常の `error` として返し、adapter 側で page/action に応じた response へ変換する。
+- `toInput` は query parse 後の `input` と `*handlererror.ValidationError` を返す形を基本にする。
 - not found を表すためだけに repository に `Find` を足さず、既存の `Search` / `Paginate` で条件取得できるならそちらを使う。
 - handler が肥大化したら、まず usecase か formatter に責務を逃がす。
 - formatter が複雑になっても、repository 呼び出しや domain mutation は入れない。
