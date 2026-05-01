@@ -11,7 +11,7 @@
 
 - `backend/`: Go アプリケーション
 - `frontend/`: Svelte + Inertia のフロントエンドと SSR。`server/` に dev 用 Vite サーバーと本番 SSR サーバーを置く
-- `mcp/`: `./blog back fmt` と `./blog back test` を HTTP 経由で公開する Go 製 MCP server
+- `mcp/`: `./blog back fmt` と `./blog back test` を HTTP 経由で公開する Go 製 MCP server。現在の公開 tool 名は `back_fmt`, `back_test`
 - `nginx/`: reverse proxy と静的アセット配信
 - `cloudflared/`: Tunnel の ingress 設定
 - `secrets/`: `dev/`, `prd/` ごとの Docker secrets
@@ -37,6 +37,7 @@
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
 - `dev` / `prd` の compose は `secrets/dev/`, `secrets/prd/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
 - `mcp` service は `docker.sock` 経由で `./blog` を叩くので、`REPO_ROOT` と repo mount path は `/home/kamiy2743/workspace/blog` のようなホスト実在 path に合わせる。`/app` のようなコンテナ内専用 path だと `docker compose` の bind mount / secrets 解決に失敗する
+- `mcp` server は `mcp/.env` の `PORT`, `REPO_ROOT`, `SERVER_NAME`, `SERVER_VERSION` を読む。HTTP path は `/` で待ち受け、`CMD` は `blog-mcp` だけを実行する
 - `dev` では `SSR_URL=http://vite-dev:5173` を使い、`vite-dev` のカスタム Node サーバーが Vite middleware と `/render` を兼ねる。開発用の別 `ssr` service は使わない
 - `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、`/error`, Vite の module/HMR/fallback favicon だけを `vite-dev:5173` へ、画面本体と API は `go` へ proxy する
 - `dev` を Windows から確認するときは、上の localhost bind と SSH トンネル利用が前提になる
@@ -53,7 +54,7 @@
 - `dev` には常駐の `go-test` service があり、`./blog back test` は `go-test` へ `docker compose exec` して実行する。`go-test` は `backend/Dockerfile.test` で依存取得を build 時に済ませ、実行時は `private` network のみで動かす
 - `./blog back test` は `go list` で `*_test.go` を持つ package だけを抽出してから `go test -mod=readonly -p 1` を流すので、`[no test files]` は出ない
 - `go-test` は `backend/.env.test` を使い、`mysql-test` へ `mysql-test:3306` で接続する。`mysql-test` は host 公開せず `private` network 内だけで使う
-- `dev` の `mcp` service は `mcp-share` external network に `blog-mcp` alias で参加し、共通の `codex` コンテナから `http://blog-mcp:<PORT>/mcp` で使う前提
+- `dev` の `mcp` service は `mcp-share` external network に `blog-mcp` alias で参加し、共通の `codex` コンテナから `http://blog-mcp:<PORT>/` で使う前提
 - `mcp` は `mcp/.env` の `PORT` を listen port に使い、`docker compose` 実行用の Docker CLI 設定は `DOCKER_CONFIG=/tmp/docker-config` と `tmpfs /tmp` で read-only rootfs から分離する
 - `backend/internal/test/helper/RequestInertia` は Inertia page object の JSON を返す正常系レスポンス向けで、plain text の `500` や redirect 検証には向かない。`InertiaResponse.AssertProps` は `200 OK` を内部で固定し、component と props の検証に使う
 - admin 配下の Inertia test は `RequestInertia` に `UseBasicAuth: true` を渡し、Basic Auth の値は helper 側で config から読む
