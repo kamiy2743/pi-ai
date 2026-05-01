@@ -53,6 +53,7 @@
 - handler に repository 呼び出し、検索条件の分岐、props の map 組み立てを持ち込まない。
 - query validation がある画面は `toInput` と parse helper を `*_request.go` に置く。
 - query validation は `*handlererror.ValidationError` を返し、page handler は最後にそのまま `error` として返す。
+- request では field 名ベースの validation error を返し、`create.name` や `update.name.{id}` のような UI 向け key への remap は feature 配下の formatter/helper に置く。
 - Inertia の lazy props を使う画面でも、props 自体は handler で `gonertia.Props` を組み立て、partial reload の分岐だけを持つ。
 - `initial` は partial reload する画面でだけ使う。partial reload しない画面は `format(result) gonertia.Props` で props を直に返す。
 - notfound のようにロジックが薄い画面は `Handler` 単体で十分なことがある。
@@ -229,6 +230,7 @@ func Format(result ShowTopResult) gonertia.Props {
 - not found を表すためだけに repository に `Find` を足さず、既存の `Search` / `Paginate` で条件取得できるならそちらを使う。
 - handler が肥大化したら、まず usecase か formatter に責務を逃がす。
 - formatter が複雑になっても、repository 呼び出しや domain mutation は入れない。
+- 空白のみ禁止のように複数 request で再利用する validation は、個別 request で毎回 `TrimSpace` せず `internal/handler/validator/` に custom rule を追加して tag で使える形に寄せる。
 
 ## Handler テスト
 

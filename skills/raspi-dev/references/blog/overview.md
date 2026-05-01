@@ -27,6 +27,7 @@
 - Inertia page の共通 props 名は `validationErrors` と `flash` を使う
 - `ValidationError` は `field -> message` の `Messages map[string]string` を持つ error として扱い、page はそのまま返し、action は session 経由で redirect back 後に表示する
 - `backend/internal/handler/session.SessionPayload` は `ValidationError *handlererror.ValidationError` と `Flash *session.Flash` を持つ
+- 同一 page 内の複数 form で validation key を分けたいときは、backend 内部では `name` のような field 名で扱い、feature 側の formatter/helper で `create.name`, `update.name.{id}` のような UI 向け key に remap する
 - top 画面のカテゴリ一覧は記事から抽出せず、`category.Repository` の `All` で全カテゴリを取得する
 - backend から frontend へ渡す日時は表示用に整形せず、ISO 8601 文字列で渡して frontend 側で整形する方針
 - `go` 側は末尾 `/` を middleware で除去して canonical URL に寄せる前提なので、`/article` と `/article/` のような二重定義は不要
@@ -49,6 +50,7 @@
 - `go-test` は `backend/.env.test` を使い、`mysql-test` へ `mysql-test:3306` で接続する。`mysql-test` は host 公開せず `private` network 内だけで使う
 - `backend/internal/test/helper/RequestInertia` は Inertia page object の JSON を返す正常系レスポンス向けで、plain text の `500` や redirect 検証には向かない。`InertiaResponse.AssertProps` は `200 OK` を内部で固定し、component と props の検証に使う
 - admin 配下の Inertia test は `RequestInertia` に `UseBasicAuth: true` を渡し、Basic Auth の値は helper 側で config から読む
+- `article/search` と `admin/show` のカテゴリ絞り込みは、カテゴリ未指定なら `categoryRepository.Search` を呼ばず空 selection のまま扱う。複数カテゴリ指定時の記事検索は OR ではなく AND 条件で、指定した全カテゴリを持つ記事だけを返す
 - `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する
 - `./blog` は project 名に `blog-dev`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
