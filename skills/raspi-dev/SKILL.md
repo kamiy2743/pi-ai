@@ -16,6 +16,7 @@ description: Raspberry Pi 上の /home/kamiy2743/workspace で作業するとき
 - Codex は Docker コンテナ内で動いており、ユーザー指定の `/home/kamiy2743/workspace/<project>` は通常 `/workspace/<project>` として見える。
 - 指定パスが存在しない場合は、まず `/workspace` 側の対応パスを確認する。ローカル画像パスやスクリーンショットでも同様に `/home/kamiy2743/workspace/...` を `/workspace/...` へ読み替えて確認する。
 - ホスト側の Docker 構成、systemd、ufw、実機デバイスなどを操作・確認する話では、コンテナ内で見える情報とホスト実体が異なる可能性を前提にする。
+- `docker.sock` 経由でホスト Docker を使うとき、bind mount や `secrets.file` の path はホスト側で解決される。コンテナ内だけで見える `/app` や `/workspace` ではなく、必要なら `/home/kamiy2743/workspace/...` のようなホスト実在 path を使う。
 - ユーザーは学習目的で Raspberry Pi 上の開発とサーバー運用をしている。
 - ユーザーは同一 LAN 内の Windows マシンから SSH で接続して作業している。
 - Windows から Pi 上の localhost 向け開発サービスを見るときは、SSH トンネルを使う運用になっている。

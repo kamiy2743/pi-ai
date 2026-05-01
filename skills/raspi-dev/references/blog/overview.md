@@ -22,6 +22,7 @@
 ## 実行時のポイント
 
 - `cloudflared` は `blog.panda-dev.net` を `http://nginx:8000` に転送する
+- Codex 上で `blog` の fmt / test を頼まれたときは、まず `mcp__blog_mcp__blog_back_fmt` / `mcp__blog_mcp__blog_back_test` を使う。ローカルの Go や Docker を先に試さない
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
 - Inertia 向け handler は adapter 経由で HTTP response へ変換する。page handler は `handlerresult.PageResult, error`、action handler は `handlerresult.ActionResult, error` を返す
@@ -35,6 +36,7 @@
 - `/admin` 配下は Go 側で Basic Auth を要求し、その資格情報は `/run/secrets/admin_basic_auth_*` から読む。公開時は Cloudflare Access と合わせて二段で保護する前提
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
 - `dev` / `prd` の compose は `secrets/dev/`, `secrets/prd/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
+- `mcp` service は `docker.sock` 経由で `./blog` を叩くので、`REPO_ROOT` と repo mount path は `/home/kamiy2743/workspace/blog` のようなホスト実在 path に合わせる。`/app` のようなコンテナ内専用 path だと `docker compose` の bind mount / secrets 解決に失敗する
 - `dev` では `SSR_URL=http://vite-dev:5173` を使い、`vite-dev` のカスタム Node サーバーが Vite middleware と `/render` を兼ねる。開発用の別 `ssr` service は使わない
 - `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、`/error`, Vite の module/HMR/fallback favicon だけを `vite-dev:5173` へ、画面本体と API は `go` へ proxy する
 - `dev` を Windows から確認するときは、上の localhost bind と SSH トンネル利用が前提になる
