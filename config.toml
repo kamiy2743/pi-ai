@@ -7,3 +7,7 @@ trust_level = "trusted"
 
 [plugins."github@openai-curated"]
 enabled = true
+
+[mcp_servers.blog-mcp]
+url = "http://blog-mcp:8000/mcp"
+enabled = true

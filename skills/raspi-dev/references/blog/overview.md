@@ -11,6 +11,7 @@
 
 - `backend/`: Go アプリケーション
 - `frontend/`: Svelte + Inertia のフロントエンドと SSR。`server/` に dev 用 Vite サーバーと本番 SSR サーバーを置く
+- `mcp/`: `./blog back fmt` と `./blog back test` を HTTP 経由で公開する Go 製 MCP server
 - `nginx/`: reverse proxy と静的アセット配信
 - `cloudflared/`: Tunnel の ingress 設定
 - `secrets/`: `dev/`, `prd/` ごとの Docker secrets
@@ -44,10 +45,14 @@
 - `backend/cmd/` は `app`, `migration`, `seed` に分かれ、通常起動と DB 操作を分離している
 - `ent` の schema と生成コードは `backend/internal/db/ent/` に置き、`./blog ent generate` はここを対象にする
 - `./blog` には `up|down|restart|recreate` に加えて `mysql`, `migrate`, `seed`, `ent generate`, `back fmt`, `back test <backend package path>` があり、基本操作はこのラッパ経由で行う
+- `./blog back fmt` と `./blog back mod tidy` は `backend/` に加えて `mcp/` も対象にする
 - `./blog back test` は Go package 単位の実行を前提とし、`backend/internal/.../show` のようなディレクトリや package path を渡す。`*_test.go` のファイル指定は受けない
 - `./blog back test backend/internal/handler/...` のように `...` で配下 package を再帰実行できる。`mysql-test` を共有するため、ラッパ側では package 並列実行を避ける `go test -p 1` を使う
-- `dev` には常駐の `go-test` service があり、`./blog back test` は `go-test` へ `docker compose exec` して実行する。初回は module / build cache を作るが、2 回目以降は cache が効く
+- `dev` には常駐の `go-test` service があり、`./blog back test` は `go-test` へ `docker compose exec` して実行する。`go-test` は `backend/Dockerfile.test` で依存取得を build 時に済ませ、実行時は `private` network のみで動かす
+- `./blog back test` は `go list` で `*_test.go` を持つ package だけを抽出してから `go test -mod=readonly -p 1` を流すので、`[no test files]` は出ない
 - `go-test` は `backend/.env.test` を使い、`mysql-test` へ `mysql-test:3306` で接続する。`mysql-test` は host 公開せず `private` network 内だけで使う
+- `dev` の `mcp` service は `mcp-share` external network に `blog-mcp` alias で参加し、共通の `codex` コンテナから `http://blog-mcp:<PORT>/mcp` で使う前提
+- `mcp` は `mcp/.env` の `PORT` を listen port に使い、`docker compose` 実行用の Docker CLI 設定は `DOCKER_CONFIG=/tmp/docker-config` と `tmpfs /tmp` で read-only rootfs から分離する
 - `backend/internal/test/helper/RequestInertia` は Inertia page object の JSON を返す正常系レスポンス向けで、plain text の `500` や redirect 検証には向かない。`InertiaResponse.AssertProps` は `200 OK` を内部で固定し、component と props の検証に使う
 - admin 配下の Inertia test は `RequestInertia` に `UseBasicAuth: true` を渡し、Basic Auth の値は helper 側で config から読む
 - `article/search` と `admin/show` のカテゴリ絞り込みは、カテゴリ未指定なら `categoryRepository.Search` を呼ばず空 selection のまま扱う。複数カテゴリ指定時の記事検索は OR ではなく AND 条件で、指定した全カテゴリを持つ記事だけを返す
@@ -71,8 +76,10 @@
 - `backend/internal/seed/`: 開発用 seed 実装
 - `backend/internal/test/`: backend integration test 用 helper と fixture
 - `backend/Dockerfile.app`: app 用イメージ
+- `backend/Dockerfile.test`: test 用イメージ
 - `backend/Dockerfile.migration`: migration 用イメージ
 - `backend/Dockerfile.seed`: seed 用イメージ
+- `mcp/Dockerfile`: MCP server 用イメージ。`docker`, `docker compose`, `buildx` plugin も同梱する
 - `docker-compose.dev.yml`: 開発 compose
 - `docker-compose.prd.yml`: 本番 compose
 - `blog`: compose ラッパ
