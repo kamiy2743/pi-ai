@@ -21,7 +21,14 @@ services:
       - ./config.toml:/home/codex/.codex/config.toml:ro
       - ./skills/:/home/codex/.codex/skills/:rw
       - ../:/workspace/:rw
+    networks:
+      - mcp
     restart: unless-stopped
+
+networks:
+  mcp:
+    external: true
+    name: mcp-share
 
 volumes:
   codex-home:
