@@ -23,6 +23,7 @@ description: Raspberry Pi 上の /home/kamiy2743/workspace で作業するとき
 - ホスト名は `kamiy2743`、mDNS 名は `kamiy2743-2.local`。
 - 保有ドメインは `panda-dev.net`。
 - SSH は公開鍵認証を使っている。
+- SSH 接続先として `pi` は `kamiy2743@kamiy2743-2.local` に対応する alias として使える。
 - `ufw` は有効で、現時点では `22/tcp` を `192.168.0.0/24` からのみ許可している。
 - 公開系プロジェクトの compose では、Cloudflare Tunnel token や Basic Auth などの機密値は `.env` ではなく `secrets/` 配下の Docker secrets で管理する運用になっている。
 - 返答は日本語で行う。
@@ -42,4 +43,5 @@ description: Raspberry Pi 上の /home/kamiy2743/workspace で作業するとき
 - `cloudflare`: `references/cloudflare/overview.md`
 - `health-check`: `references/health-check/overview.md`
 - `http-server`: `references/http-server/overview.md`
+- `monitoring`: `references/monitoring/overview.md`
 - `root-domain`: `references/root-domain/overview.md`
