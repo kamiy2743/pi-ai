@@ -26,10 +26,11 @@
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
 - Inertia 向け handler は adapter 経由で HTTP response へ変換する。page handler は `handlerresult.PageResult, error`、action handler は `handlerresult.ActionResult, error` を返す
-- Inertia page の共通 props 名は `validationErrors` と `flash` を使う
+- Inertia page の共通 props 名は `oldInput`, `validationErrors`, `flash` の順で使う
 - `ValidationError` は `field -> message` の `Messages map[string]string` を持つ error として扱い、page はそのまま返し、action は session 経由で redirect back 後に表示する
-- `backend/internal/handler/session.SessionPayload` は `ValidationError *handlererror.ValidationError` と `Flash *session.Flash` を持つ
-- 同一 page 内の複数 form で validation key を分けたいときは、backend 内部では `name` のような field 名で扱い、feature 側の formatter/helper で `create.name`, `update.name.{id}` のような UI 向け key に remap する
+- action adapter はエラー時に request body の string field を `oldInput` として session に保存する。body は読み戻してから handler に渡すので、feature handler で oldInput 保存はしない
+- `backend/internal/handler/session.SessionPayload` は `OldInput map[string]string`, `ValidationError *handlererror.ValidationError`, `Flash *session.Flash` をこの順で持つ
+- 同一 page 内の複数 form で field 名が重なるときは、hidden field `formKey` で form を識別する。validation key は backend では `name` のような field 名のまま扱い、frontend 側で `oldInput.formKey` を見て対象 form の値と error を表示する
 - top 画面のカテゴリ一覧は記事から抽出せず、`category.Repository` の `All` で全カテゴリを取得する
 - backend から frontend へ渡す日時は表示用に整形せず、ISO 8601 文字列で渡して frontend 側で整形する方針
 - `go` 側は末尾 `/` を middleware で除去して canonical URL に寄せる前提なので、`/article` と `/article/` のような二重定義は不要
@@ -58,6 +59,7 @@
 - `mcp` は `mcp/.env` の `PORT` を listen port に使い、`docker compose` 実行用の Docker CLI 設定は `DOCKER_CONFIG=/tmp/docker-config` と `tmpfs /tmp` で read-only rootfs から分離する
 - `backend/internal/test/helper/RequestInertia` は Inertia page object の JSON を返す正常系レスポンス向けで、plain text の `500` や redirect 検証には向かない。`InertiaResponse.AssertProps` は `200 OK` を内部で固定し、component と props の検証に使う
 - admin 配下の Inertia test は `RequestInertia` に `UseBasicAuth: true` を渡し、Basic Auth の値は helper 側で config から読む
+- Inertia action test は `internal/test/helper/inertia/action` を使い、redirect 先、`oldInput`, `validationErrors`, `flash` を必要に応じて session payload から検証する。複数 form の画面では request body に `formKey` を含める
 - `article/search` と `admin/show` のカテゴリ絞り込みは、カテゴリ未指定なら `categoryRepository.Search` を呼ばず空 selection のまま扱う。複数カテゴリ指定時の記事検索は OR ではなく AND 条件で、指定した全カテゴリを持つ記事だけを返す
 - `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する

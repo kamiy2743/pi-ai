@@ -53,7 +53,7 @@
 - handler に repository 呼び出し、検索条件の分岐、props の map 組み立てを持ち込まない。
 - query validation がある画面は `toInput` と parse helper を `*_request.go` に置く。
 - query validation は `*handlererror.ValidationError` を返し、page handler は最後にそのまま `error` として返す。
-- request では field 名ベースの validation error を返し、`create.name` や `update.name.{id}` のような UI 向け key への remap は feature 配下の formatter/helper に置く。
+- request では field 名ベースの validation error を返す。複数 form で field 名が重なる画面は、UI 向けに validation key を remap せず、hidden field `formKey` と `oldInput.formKey` で frontend 側が対象 form を判定する。
 - Inertia の lazy props を使う画面でも、props 自体は handler で `gonertia.Props` を組み立て、partial reload の分岐だけを持つ。
 - `initial` は partial reload する画面でだけ使う。partial reload しない画面は `format(result) gonertia.Props` で props を直に返す。
 - notfound のようにロジックが薄い画面は `Handler` 単体で十分なことがある。
@@ -69,9 +69,11 @@
   - `PageResult` から Inertia render
   - `ActionResult.RedirectTo` から redirect
   - `ValidationError` / `DisplayableError` の解釈
-  - session の flash / validation error の保存と復元
+  - session の oldInput / validation error / flash の保存と復元
 - action の validation error は adapter が session に保存して redirect back する。
+- action の error 時は adapter が request body の string field を `oldInput` として保存する。adapter が body を読み戻すので、feature handler で oldInput 保存処理を呼ばない。
 - page の validation error は adapter が `validationErrors` props に載せて通常の page render に流す。
+- page props に載せる共通値は `oldInput`, `validationErrors`, `flash` の順を基準にする。
 
 ## Usecase の書き方
 
@@ -237,5 +239,7 @@ func Format(result ShowTopResult) gonertia.Props {
 - integration test では、HTTP サーバー初期化と DB 初期化は `internal/test/` に寄せ、個別 test は seed と期待値に集中させる。
 - Inertia の画面 test では、共通の request helper と response helper を `internal/test/helper/` に置き、各 test で request 構築や JSON decode を繰り返さない。
 - Inertia response の検証は、status code / component / props をまとめて検証する helper か method に寄せる。
+- Inertia action test は action 用 helper で送信し、redirect 先に加えて `oldInput`, `validationErrors`, `flash` を必要な分だけ session payload から検証する。
+- 複数 form がある画面の action test では、request body に `formKey` を含め、`oldInput` も `formKey` と入力 field を期待値に含める。
 - props 全体を struct 化しにくい場合は、typed struct より JSON 比較や `gonertia.props` 比較を優先してよい。
 - fixture は `internal/test/fixture/<entity>/` に置き、位置引数が増えるなら入力 struct を定義して可読性を保つ。
