@@ -36,6 +36,8 @@
 - `go` 側は末尾 `/` を middleware で除去して canonical URL に寄せる前提なので、`/article` と `/article/` のような二重定義は不要
 - `/admin` 配下は Go 側で Basic Auth を要求し、その資格情報は `/run/secrets/admin_basic_auth_*` から読む。公開時は Cloudflare Access と合わせて二段で保護する前提
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
+- 管理画面の記事作成は作成時点で公開/非公開、公開開始時刻、公開終了時刻を指定できる前提にする。本文 field は DB/domain の `body` に合わせ、旧 UI の `content_md` へ寄せない
+- Svelte/Inertia の default layout でページ本体と常設 UI（例: global flash）を並べるときは fragment root にせず、安定した wrapper を置く。prd SSR で hydration 時の DOM 差し込み先が不安定になるのを避けるため
 - `dev` / `prd` の compose は `secrets/dev/`, `secrets/prd/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
 - `mcp` service は `docker.sock` 経由で `./blog` を叩くので、`REPO_ROOT` と repo mount path は `/home/kamiy2743/workspace/blog` のようなホスト実在 path に合わせる。`/app` のようなコンテナ内専用 path だと `docker compose` の bind mount / secrets 解決に失敗する
 - `mcp` server は `mcp/.env` の `PORT`, `REPO_ROOT`, `SERVER_NAME`, `SERVER_VERSION` を読む。HTTP path は `/` で待ち受け、`CMD` は `blog-mcp` だけを実行する
