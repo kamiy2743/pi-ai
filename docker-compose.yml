@@ -6,6 +6,7 @@ services:
         HOST_UID: ${HOST_UID}
         HOST_GID: ${HOST_GID}
         CODEX_VERSION: ${CODEX_VERSION}
+        CODEX_TARGET: ${CODEX_TARGET}
     working_dir: /workspace
     command: ["sleep", "infinity"]
     cap_drop:

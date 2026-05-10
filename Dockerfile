@@ -3,7 +3,7 @@ FROM debian:bookworm-slim
 ARG HOST_UID
 ARG HOST_GID
 ARG CODEX_VERSION
-ARG CODEX_TARGET=aarch64-unknown-linux-musl
+ARG CODEX_TARGET
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
