@@ -32,7 +32,7 @@
 - `backend/internal/handler/session.SessionPayload` は `OldInput map[string]string`, `ValidationError *handlererror.ValidationError`, `Flash *session.Flash` をこの順で持つ
 - 同一 page 内の複数 form で field 名が重なるときは、hidden field `formKey` で form を識別する。validation key は backend では `name` のような field 名のまま扱い、frontend 側で `oldInput.formKey` を見て対象 form の値と error を表示する
 - top 画面のカテゴリ一覧は記事から抽出せず、`category.Repository` の `All` で全カテゴリを取得する
-- backend から frontend へ渡す日時は表示用に整形せず、ISO 8601 文字列で渡して frontend 側で整形する方針
+- 日時は DB / backend では UTC に統一し、backend から frontend へ渡すときだけ ISO 8601 文字列にする。frontend では ISO 8601 として扱い、画面表示時だけ JST に整形する
 - `go` 側は末尾 `/` を middleware で除去して canonical URL に寄せる前提なので、`/article` と `/article/` のような二重定義は不要
 - `/admin` 配下は Go 側で Basic Auth を要求し、その資格情報は `/run/secrets/admin_basic_auth_*` から読む。公開時は Cloudflare Access と合わせて二段で保護する前提
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
@@ -44,6 +44,7 @@
 - `dev` では `SSR_URL=http://vite-dev:5173` を使い、`vite-dev` のカスタム Node サーバーが Vite middleware と `/render` を兼ねる。開発用の別 `ssr` service は使わない
 - `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、`/error`, Vite の module/HMR/fallback favicon だけを `vite-dev:5173` へ、画面本体と API は `go` へ proxy する
 - `dev` を Windows から確認するときは、上の localhost bind と SSH トンネル利用が前提になる
+- Codex コンテナには Node / npm が入っていないため、frontend の build / typecheck は直接実行できない。必要ならホスト側または frontend 用コンテナで確認する
 - `prd` の `nginx` は `/dist/client/` を直接返し、それ以外を `go` へ proxy する
 - `prd` の `ssr` は `frontend/Dockerfile.ssr` から起動し、`frontend/server/ssr-server.ts` が `/render` と `/health` を返す
 - `frontend/public/` の静的ファイルは dev では Vite dev server がルート直下 `/...` で返し、prd では client build 後に `/dist/client/...` として nginx から返す
@@ -67,6 +68,7 @@
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する
 - `./blog` は project 名に `blog-dev`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
 - MySQL は初期化時に data directory 以外にも書き込みが発生するため、`read_only: true` にはしない
+- 記事本文 Markdown は backend domain で HTML へ変換し、sanitize 後の HTML を frontend の `{@html ...}` で表示する。Markdown 拡張や link 属性のような本文 HTML の仕様は、この変換処理側で揃える
 
 ## 重要ファイル
 
@@ -76,6 +78,7 @@
 - `backend/internal/config/`: backend の env / Docker secrets 読み取り
 - `backend/internal/db/`: MySQL / ent client の接続処理
 - `backend/internal/domain/`: `article`, `category` などの domain 型
+- `backend/internal/datetime/`: UTC / ISO 8601 変換を集約する日時 helper
 - `backend/internal/db/ent/`: ent schema と生成コード
 - `backend/internal/handler/`: handler 群。例: `admin/article/create/`, `article/search/`, `top/show/`
 - handler 実装の参考: `top/show` はトップ画面、`article/search` と `admin/show` は initial / partialSearch を持つ検索・ページング、`article/show` は path ID からの詳細表示
@@ -102,7 +105,3 @@
 - `frontend/server/render.ts`: dev / prd 共通の Inertia SSR 描画処理
 - `frontend/server/ssr-server.ts`: 本番 SSR サーバー
 - `cloudflared/config.yml`: Tunnel ingress 設定
-
-## 現状メモ
-
-- バックエンドは Inertia の画面遷移とルーティングの骨組みが中心で、記事 CRUD や DB アクセスは未完成の部分がある
