@@ -1,6 +1,8 @@
 sandbox_mode = "danger-full-access"
 
 approvals_reviewer = "user"
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
 
 [projects."/workspace"]
 trust_level = "trusted"
@@ -11,3 +13,6 @@ enabled = true
 [mcp_servers.blog-mcp]
 url = "http://blog-mcp:8000"
 enabled = true
+
+[tui.model_availability_nux]
+"gpt-5.5" = 1

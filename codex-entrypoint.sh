@@ -2,8 +2,32 @@
 
 set -euo pipefail
 
+codex_dir="${HOME}/.codex"
+workspace_ai_dir="/workspace/ai"
+config_src="${workspace_ai_dir}/config.toml"
+config_dst="${codex_dir}/config.toml"
+skills_src="${workspace_ai_dir}/skills"
+skills_dst="${codex_dir}/skills"
 log_file="${HOME}/.codex/log/codex-tui.log"
 start_size=0
+
+mkdir -p "${codex_dir}" "${codex_dir}/log"
+
+if [ -e "${config_dst}" ] && [ ! -L "${config_dst}" ]; then
+	mv "${config_dst}" "${config_dst}.pre-symlink.$(date +%s)"
+fi
+
+if [ ! -e "${config_dst}" ]; then
+	ln -s "${config_src}" "${config_dst}"
+fi
+
+if [ -e "${skills_dst}" ] && [ ! -L "${skills_dst}" ]; then
+	mv "${skills_dst}" "${skills_dst}.pre-symlink.$(date +%s)"
+fi
+
+if [ ! -e "${skills_dst}" ]; then
+	ln -s "${skills_src}" "${skills_dst}"
+fi
 
 if [ -f "$log_file" ]; then
 	start_size="$(wc -c < "$log_file" 2>/dev/null || printf "0")"

@@ -19,9 +19,7 @@ services:
     volumes:
       - codex-home:/home/codex/.codex/
       - codex-cache:/home/codex/.cache/
-      - ./config.toml:/home/codex/.codex/config.toml:ro
-      - ./skills/:/home/codex/.codex/skills/:rw
-      - ../:/workspace/:rw
+      - ../:/workspace/
     networks:
       - mcp
     restart: unless-stopped

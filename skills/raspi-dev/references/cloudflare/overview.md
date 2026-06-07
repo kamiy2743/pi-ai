@@ -17,6 +17,8 @@
 - Zone リソースは `zone/panda_dev_net/` に置く
 - `variables.tf` と `terraform.tfvars` はディレクトリごとに管理する
 - state は `zero_trust` と `zone` で分離する
+- Terraform の `TF_VAR_*` は repo root の `.envrc` で読み込む運用。子ディレクトリで直接作業する場合は direnv hook が必要で、必要なら子 `.envrc` から `source_env ../../.envrc` のように親を読む
+- `blog-stg.panda-dev.net` のような staging 公開は Cloudflare Tunnel だけでは外部遮断できないため、Zero Trust Access で認証を必須にする。Account スコープの Access Application / Policy は `zero_trust/` で管理する
 
 ## Cache Rule の注意
 

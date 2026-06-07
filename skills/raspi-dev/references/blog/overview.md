@@ -14,14 +14,15 @@
 - `mcp/`: `./blog back fmt` と `./blog back test` を HTTP 経由で公開する Go 製 MCP server。現在の公開 tool 名は `back_fmt`, `back_test`
 - `nginx/`: reverse proxy と静的アセット配信
 - `cloudflared/`: Tunnel の ingress 設定
-- `secrets/`: `dev/`, `prd/` ごとの Docker secrets
+- `secrets/`: `dev/`, `stg`, `prd` ごとの Docker secrets。開発 repo 内では管理するが、本番 VM では repo 外の `/etc/blog/secrets/prd/` のような root 管理ディレクトリへ切り離す方針
 - `docker-compose.dev.yml`: 開発用の `nginx`, `go`, `go-test`, `mysql`, `mysql-test`, `vite-dev`
+- `docker-compose.stg.yml`: staging 用の `nginx`, `go`, `mysql`, `ssr`, `cloudflared`
 - `docker-compose.prd.yml`: 本番用の `nginx`, `go`, `mysql`, `ssr`, `cloudflared`
-- `blog`: `./blog {dev|prd} ...` で `docker compose -p blog-{env}` を呼ぶラッパ。基本的な操作は `docker compose` を直接叩かず、原則 `./blog` 経由で行う
+- `blog`: `./blog {dev|stg|prd} ...` で `docker compose -p blog-{env}` を呼ぶラッパ。基本的な操作は `docker compose` を直接叩かず、原則 `./blog` 経由で行う
 
 ## 実行時のポイント
 
-- `cloudflared` は `blog.panda-dev.net` を `http://nginx:8000` に転送する
+- `cloudflared` は `blog.panda-dev.net` / `blog-stg.panda-dev.net` を `http://nginx:8000` に転送する。stg は外部公開する場合、Cloudflare Access で認証を必須にする
 - Codex 上で `blog` の fmt / test を頼まれたときは、まず `mcp__blog_mcp__blog_back_fmt` / `mcp__blog_mcp__blog_back_test` を使う。ローカルの Go や Docker を先に試さない
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
@@ -38,17 +39,17 @@
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
 - 管理画面の記事作成は作成時点で公開/非公開、公開開始時刻、公開終了時刻を指定できる前提にする。本文 field は DB/domain の `body` に合わせ、旧 UI の `content_md` へ寄せない
 - Svelte/Inertia の default layout でページ本体と常設 UI（例: global flash）を並べるときは fragment root にせず、安定した wrapper を置く。prd SSR で hydration 時の DOM 差し込み先が不安定になるのを避けるため
-- `dev` / `prd` の compose は `secrets/dev/`, `secrets/prd/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
+- `dev` / `stg` / `prd` の compose は `secrets/<env>/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
 - `mcp` service は `docker.sock` 経由で `./blog` を叩くので、`REPO_ROOT` と repo mount path は `/home/kamiy2743/workspace/blog` のようなホスト実在 path に合わせる。`/app` のようなコンテナ内専用 path だと `docker compose` の bind mount / secrets 解決に失敗する
 - `mcp` server は `mcp/.env` の `PORT`, `REPO_ROOT`, `SERVER_NAME`, `SERVER_VERSION` を読む。HTTP path は `/` で待ち受け、`CMD` は `blog-mcp` だけを実行する
 - `dev` では `SSR_URL=http://vite-dev:5173` を使い、`vite-dev` のカスタム Node サーバーが Vite middleware と `/render` を兼ねる。開発用の別 `ssr` service は使わない
 - `dev` の `nginx` は `127.0.0.1:8000` を host に bind し、`/error`, Vite の module/HMR/fallback favicon だけを `vite-dev:5173` へ、画面本体と API は `go` へ proxy する
 - `dev` を Windows から確認するときは、上の localhost bind と SSH トンネル利用が前提になる
 - Codex コンテナには Node / npm が入っていないため、frontend の build / typecheck は直接実行できない。必要ならホスト側または frontend 用コンテナで確認する
-- `prd` の `nginx` は `/dist/client/` を直接返し、それ以外を `go` へ proxy する
-- `prd` の `ssr` は `frontend/Dockerfile.ssr` から起動し、`frontend/server/ssr-server.ts` が `/render` と `/health` を返す
-- `frontend/public/` の静的ファイルは dev では Vite dev server がルート直下 `/...` で返し、prd では client build 後に `/dist/client/...` として nginx から返す
-- `nginx/snippets/header.conf` に CSP の共通形を置き、`dev.conf` / `prd.conf` では `set $csp_connect_src ...` で `connect-src` だけ出し分ける。dev は HMR 用に `ws://localhost:8000` を許可する
+- `stg` / `prd` の `nginx` は `/dist/client/` を直接返し、それ以外を `go` へ proxy する
+- `stg` / `prd` の `ssr` は `frontend/Dockerfile.ssr` から起動し、`frontend/server/ssr-server.ts` が `/render` と `/health` を返す
+- `frontend/public/` の静的ファイルは dev では Vite dev server がルート直下 `/...` で返し、stg / prd では client build 後に `/dist/client/...` として nginx から返す
+- `nginx/snippets/header.conf` に CSP の共通形を置き、`dev.conf` / `stg.conf` / `prd.conf` では `set $csp_connect_src ...` で `connect-src` だけ出し分ける。dev は HMR 用に `ws://localhost:8000` を許可する
 - `backend/cmd/` は `app`, `migration`, `seed` に分かれ、通常起動と DB 操作を分離している
 - `ent` の schema と生成コードは `backend/internal/db/ent/` に置き、`./blog ent generate` はここを対象にする
 - `./blog` には `up|down|restart|recreate` に加えて `mysql`, `migrate`, `seed`, `ent generate`, `back fmt`, `back test <backend package path>` があり、基本操作はこのラッパ経由で行う
@@ -66,7 +67,8 @@
 - `article/search` と `admin/show` のカテゴリ絞り込みは、カテゴリ未指定なら `categoryRepository.Search` を呼ばず空 selection のまま扱う。複数カテゴリ指定時の記事検索は OR ではなく AND 条件で、指定した全カテゴリを持つ記事だけを返す
 - `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する
-- `./blog` は project 名に `blog-dev`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
+- `./blog` は project 名に `blog-dev`, `blog-stg`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
+- 本番デプロイは prd VM で build せず、dev VM や CI で `go` / `nginx` / `ssr` image を build して registry に push し、prd VM は pull + run に寄せる方針が望ましい
 - MySQL は初期化時に data directory 以外にも書き込みが発生するため、`read_only: true` にはしない
 - 記事本文 Markdown は backend domain で HTML へ変換し、sanitize 後の HTML を frontend の `{@html ...}` で表示する。Markdown 拡張や link 属性のような本文 HTML の仕様は、この変換処理側で揃える
 
@@ -91,9 +93,11 @@
 - `backend/Dockerfile.seed`: seed 用イメージ
 - `mcp/Dockerfile`: MCP server 用イメージ。`docker`, `docker compose`, `buildx` plugin も同梱する
 - `docker-compose.dev.yml`: 開発 compose
+- `docker-compose.stg.yml`: staging compose
 - `docker-compose.prd.yml`: 本番 compose
 - `blog`: compose ラッパ
 - `nginx/dev.conf`: 開発 nginx 設定
+- `nginx/stg.conf`: staging nginx 設定
 - `nginx/prd.conf`: 本番 nginx 設定
 - `nginx/snippets/upstream.conf`: `go` upstream 定義
 - `nginx/snippets/header.conf`: 共通セキュリティヘッダーと CSP テンプレート
@@ -104,4 +108,4 @@
 - `frontend/server/dev-server.mjs`: dev 用の Vite + SSR エントリポイント
 - `frontend/server/render.ts`: dev / prd 共通の Inertia SSR 描画処理
 - `frontend/server/ssr-server.ts`: 本番 SSR サーバー
-- `cloudflared/config.yml`: Tunnel ingress 設定
+- `cloudflared/config.stg.yml`, `cloudflared/config.prd.yml`: Tunnel ingress 設定
