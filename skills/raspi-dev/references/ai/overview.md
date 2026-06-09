@@ -7,7 +7,7 @@
 ## 構成
 
 - `docker-compose.yml` は `codex` サービスを定義し、`sleep infinity` で常駐させる。
-- `Dockerfile` は Debian bookworm-slim ベースで、`bubblewrap`, `curl`, `git`, `openssh-client`, `ripgrep` を入れ、OpenAI Codex の Linux aarch64 musl 版を GitHub Releases から取得する。
+- `Dockerfile` は Debian bookworm-slim ベースで、`bubblewrap`, `curl`, `git`, `openssh-client`, `ripgrep` と Go toolchain を入れ、OpenAI Codex の Linux musl 版を GitHub Releases から取得する。
 - `codex` は `docker compose exec codex` で Codex を起動するラッパースクリプト。
 - `codex` は起動直後に `/home/codex/.codex/log/codex-tui.log` へ出る `thread_id` を監視し、検出したセッションIDを `/proc/1/fd/1` へ書いてコンテナログへ出す。
 - `config.toml` は Codex 設定で、`/workspace` を trusted project とし、GitHub curated plugin を有効化している。
@@ -16,11 +16,12 @@
 
 ## Docker 実行環境
 
-- `codex-home` と `codex-cache` は Docker volume。
+- `codex-home`, `codex-cache`, `go-cache` は Docker volume。
+- `go-cache` は `/home/codex/go/` に mount し、Go の module cache を read-only rootfs の外へ逃がす。
 - `./config.toml` はホスト側の実体設定として使い、起動時に `/home/codex/.codex/config.toml` から symlink で参照される。
 - `../` は `/workspace/` に read-write でマウントされる。
 - コンテナは `cap_drop: ALL`, `no-new-privileges:true`, `read_only: true`, `/tmp` tmpfs で動かす。
-- build args は `.env` 由来の `HOST_UID`, `HOST_GID`, `CODEX_VERSION` を使う。`.env` の値は reference に残さない。
+- build args は `.env` 由来の `HOST_UID`, `HOST_GID`, `CODEX_VERSION`, `CODEX_TARGET`, `GO_VERSION` を使う。`.env` の値は reference に残さない。
 
 ## Codex 設定
 

@@ -7,6 +7,7 @@ services:
         HOST_GID: ${HOST_GID}
         CODEX_VERSION: ${CODEX_VERSION}
         CODEX_TARGET: ${CODEX_TARGET}
+        GO_VERSION: ${GO_VERSION}
     working_dir: /workspace
     command: ["sleep", "infinity"]
     cap_drop:
@@ -19,6 +20,7 @@ services:
     volumes:
       - codex-home:/home/codex/.codex/
       - codex-cache:/home/codex/.cache/
+      - go-cache:/home/codex/go/
       - ../:/workspace/
     networks:
       - mcp
@@ -32,3 +34,4 @@ networks:
 volumes:
   codex-home:
   codex-cache:
+  go-cache:

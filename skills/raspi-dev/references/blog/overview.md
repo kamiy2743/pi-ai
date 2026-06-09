@@ -11,7 +11,7 @@
 
 - `backend/`: Go アプリケーション
 - `frontend/`: Svelte + Inertia のフロントエンドと SSR。`server/` に dev 用 Vite サーバーと本番 SSR サーバーを置く
-- `mcp/`: `./blog back fmt` と `./blog back test` を HTTP 経由で公開する Go 製 MCP server。現在の公開 tool 名は `back_fmt`, `back_test`
+- `mcp/`: `./blog back test` を HTTP 経由で公開する Go 製 MCP server。現在の公開 tool 名は `back_test`
 - `nginx/`: reverse proxy と静的アセット配信
 - `cloudflared/`: Tunnel の ingress 設定
 - `secrets/`: `dev/`, `stg`, `prd` ごとの Docker secrets。開発 repo 内では管理するが、本番 VM では repo 外の `/etc/blog/secrets/prd/` のような root 管理ディレクトリへ切り離す方針
@@ -23,7 +23,8 @@
 ## 実行時のポイント
 
 - `cloudflared` は `blog.panda-dev.net` / `blog-stg.panda-dev.net` を `http://nginx:8000` に転送する。stg は外部公開する場合、Cloudflare Access で認証を必須にする
-- Codex 上で `blog` の fmt / test を頼まれたときは、まず `mcp__blog_mcp__blog_back_fmt` / `mcp__blog_mcp__blog_back_test` を使う。ローカルの Go や Docker を先に試さない
+- `dev` / `stg` は dev VM 上で動かし、`prd` は prd VM 上で動かす。VM が分かれるため Docker volume、network、secrets、git checkout、image cache は共有されない前提で扱う
+- Codex 上で `blog` の test を頼まれたときは、まず `mcp__blog_mcp__blog_back_test` を使う。fmt は Codex コンテナ側の `gofmt` / `go fmt` で実行する
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
 - Inertia 向け handler は adapter 経由で HTTP response へ変換する。page handler は `handlerresult.PageResult, error`、action handler は `handlerresult.ActionResult, error` を返す
@@ -53,7 +54,7 @@
 - `backend/cmd/` は `app`, `migration`, `seed` に分かれ、通常起動と DB 操作を分離している
 - `ent` の schema と生成コードは `backend/internal/db/ent/` に置き、`./blog ent generate` はここを対象にする
 - `./blog` には `up|down|restart|recreate` に加えて `mysql`, `migrate`, `seed`, `ent generate`, `back fmt`, `back test <backend package path>` があり、基本操作はこのラッパ経由で行う
-- `./blog back fmt` と `./blog back mod tidy` は `backend/` に加えて `mcp/` も対象にする
+- `./blog back fmt` と `./blog back mod tidy` は `backend/`, `mcp/`, `blogcmd/` の各 Go module を対象にする。fmt は各 module で `go fmt ./...` を実行する
 - `./blog back test` は Go package 単位の実行を前提とし、`backend/internal/.../show` のようなディレクトリや package path を渡す。`*_test.go` のファイル指定は受けない
 - `./blog back test backend/internal/handler/...` のように `...` で配下 package を再帰実行できる。`mysql-test` を共有するため、ラッパ側では package 並列実行を避ける `go test -p 1` を使う
 - `dev` には常駐の `go-test` service があり、`./blog back test` は `go-test` へ `docker compose exec` して実行する。`go-test` は `backend/Dockerfile.test` で依存取得を build 時に済ませ、実行時は `private` network のみで動かす
@@ -68,7 +69,8 @@
 - `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する
 - `./blog` は project 名に `blog-dev`, `blog-stg`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
-- 本番デプロイは prd VM で build せず、dev VM や CI で `go` / `nginx` / `ssr` image を build して registry に push し、prd VM は pull + run に寄せる方針が望ましい
+- `./blog` の実装本体は `blogcmd/` の独立 Go module。`./blog build` で `blogcmd/bin/blogcmd` をビルドし、それ以外の `./blog ...` は `blogcmd/bin/blogcmd` へそのまま渡す
+- `stg` / `prd` は dev VM で `./blog {stg|prd} image build-push` により `go` / `nginx` / `ssr` / `migration` / `seed` image を build + push し、実行環境では `./blog {stg|prd} deploy` と `./blog {stg|prd} migrate up` で pull + run する。実行環境には repo 全体ではなく、`blog`, `blogcmd/bin/blogcmd`, `docker-compose.<env>.yml`, `backend/.env.<env>`, `frontend/.env`, `cloudflared/config.<env>.yml` など必要ファイルだけを既存 path のまま配置する。image は `ghcr.io/kamiy2743/blog/{go,nginx,ssr,migration,seed}:<env>` 固定
 - MySQL は初期化時に data directory 以外にも書き込みが発生するため、`read_only: true` にはしない
 - 記事本文 Markdown は backend domain で HTML へ変換し、sanitize 後の HTML を frontend の `{@html ...}` で表示する。Markdown 拡張や link 属性のような本文 HTML の仕様は、この変換処理側で揃える
 
@@ -96,6 +98,7 @@
 - `docker-compose.stg.yml`: staging compose
 - `docker-compose.prd.yml`: 本番 compose
 - `blog`: compose ラッパ
+- `blogcmd/cmd/app/main.go`: `blogcmd` のエントリポイントと top-level dispatch。実装本体は `blogcmd/internal/` 配下に command ごとの package として置く
 - `nginx/dev.conf`: 開発 nginx 設定
 - `nginx/stg.conf`: staging nginx 設定
 - `nginx/prd.conf`: 本番 nginx 設定
@@ -109,3 +112,4 @@
 - `frontend/server/render.ts`: dev / prd 共通の Inertia SSR 描画処理
 - `frontend/server/ssr-server.ts`: 本番 SSR サーバー
 - `cloudflared/config.stg.yml`, `cloudflared/config.prd.yml`: Tunnel ingress 設定
+- `docs/prd-image-deploy.md`: dev VM で stg/prd image を build + push し、実行環境へ必要ファイルだけ配置して pull + run する手順

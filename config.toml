@@ -14,5 +14,11 @@ enabled = true
 url = "http://blog-mcp:8000"
 enabled = true
 
+[mcp_servers.blog-mcp.tools.back_test]
+approval_mode = "approve"
+
 [tui.model_availability_nux]
-"gpt-5.5" = 1
+"gpt-5.5" = 4
+
+[notice]
+hide_rate_limit_model_nudge = true
