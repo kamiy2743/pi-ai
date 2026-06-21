@@ -14,7 +14,7 @@
 - `mcp/`: `./blog back test` を HTTP 経由で公開する Go 製 MCP server。現在の公開 tool 名は `back_test`
 - `nginx/`: reverse proxy と静的アセット配信
 - `cloudflared/`: Tunnel の ingress 設定
-- `secrets/`: `dev/`, `stg`, `prd` ごとの Docker secrets。開発 repo 内では管理するが、本番 VM では repo 外の `/etc/blog/secrets/prd/` のような root 管理ディレクトリへ切り離す方針
+- `secrets/`: `dev/`, `stg`, `prd` ごとの Docker secrets。dev/stg は repo 内 `secrets/<env>/` を使い、prd は deploy 時に `/etc/blog/secrets/` 直下へ同期する
 - `docker-compose.dev.yml`: 開発用の `nginx`, `go`, `go-test`, `mysql`, `mysql-test`, `vite-dev`
 - `docker-compose.stg.yml`: staging 用の `nginx`, `go`, `mysql`, `ssr`, `cloudflared`
 - `docker-compose.prd.yml`: 本番用の `nginx`, `go`, `mysql`, `ssr`, `cloudflared`
@@ -23,7 +23,7 @@
 ## 実行時のポイント
 
 - `cloudflared` は `blog.panda-dev.net` / `blog-stg.panda-dev.net` を `http://nginx:8000` に転送する。stg は外部公開する場合、Cloudflare Access で認証を必須にする
-- `dev` / `stg` は dev VM 上で動かし、`prd` は prd VM 上で動かす。VM が分かれるため Docker volume、network、secrets、git checkout、image cache は共有されない前提で扱う
+- `dev` / `stg` は dev マシン上、`prd` は prd マシン上で動かす。SSH 名は dev/stg 側が `eq14-dev`、prd 側が `eq14-prd`。prd とは Docker volume、network、secrets、git checkout、image cache が共有されない前提で扱う
 - Codex 上で `blog` の test を頼まれたときは、まず `mcp__blog_mcp__blog_back_test` を使う。fmt は Codex コンテナ側の `gofmt` / `go fmt` で実行する
 - `backend/internal/config/` で env と Docker secrets の取得をまとめ、`go` は `APP_ENV`, `PORT`, `SSR_URL`, `INERTIA_TEMPLATES_DIR`, `TEMPLATE_*` などを前提に Inertia SSR を使う
 - `backend/` の Go 実装方針を読むときは `go-impl` スキルを優先し、ここでは Raspberry Pi 上の構成・運用前提だけを見る
@@ -40,7 +40,7 @@
 - 管理画面のカテゴリ管理は `GET/POST /admin/category`, `POST /admin/category/{categoryId}`, `POST /admin/category/{categoryId}/delete` を基本形にする。HTML form 前提なので削除も POST で扱う
 - 管理画面の記事作成は作成時点で公開/非公開、公開開始時刻、公開終了時刻を指定できる前提にする。本文 field は DB/domain の `body` に合わせ、旧 UI の `content_md` へ寄せない
 - Svelte/Inertia の default layout でページ本体と常設 UI（例: global flash）を並べるときは fragment root にせず、安定した wrapper を置く。prd SSR で hydration 時の DOM 差し込み先が不安定になるのを避けるため
-- `dev` / `stg` / `prd` の compose は `secrets/<env>/` を参照し、MySQL の root password, user, user password も Docker secrets で渡す
+- `dev` / `stg` の compose は `secrets/<env>/`、prd compose と prd の `migrate` / `seed` は `/etc/blog/secrets/` を参照する。MySQL の root password, user, user password も Docker secrets で渡す
 - `mcp` service は `docker.sock` 経由で `./blog` を叩くので、`REPO_ROOT` と repo mount path は `/home/kamiy2743/workspace/blog` のようなホスト実在 path に合わせる。`/app` のようなコンテナ内専用 path だと `docker compose` の bind mount / secrets 解決に失敗する
 - `mcp` server は `mcp/.env` の `PORT`, `REPO_ROOT`, `SERVER_NAME`, `SERVER_VERSION` を読む。HTTP path は `/` で待ち受け、`CMD` は `blog-mcp` だけを実行する
 - `dev` では `SSR_URL=http://vite-dev:5173` を使い、`vite-dev` のカスタム Node サーバーが Vite middleware と `/render` を兼ねる。開発用の別 `ssr` service は使わない
@@ -66,11 +66,12 @@
 - admin 配下の Inertia test は `RequestInertia` に `UseBasicAuth: true` を渡し、Basic Auth の値は helper 側で config から読む
 - Inertia action test は `internal/test/helper/inertia/action` を使い、redirect 先、`oldInput`, `validationErrors`, `flash` を必要に応じて session payload から検証する。複数 form の画面では request body に `formKey` を含める
 - `article/search` と `admin/show` のカテゴリ絞り込みは、カテゴリ未指定なら `categoryRepository.Search` を呼ばず空 selection のまま扱う。複数カテゴリ指定時の記事検索は OR ではなく AND 条件で、指定した全カテゴリを持つ記事だけを返す
-- `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する
+- `./blog {env} migrate ...` と `./blog {env} seed ...` は compose の常駐 service ではなく、専用 Dockerfile から one-shot コンテナを起動して実行する。prd では `/etc/blog/secrets/` を `/run/secrets` に bind mount する
 - 開発用 seed は SQL ファイルではなく `backend/cmd/seed` から ent 経由で投入する
 - `./blog` は project 名に `blog-dev`, `blog-stg`, `blog-prd` を使うので、volume や network 名にもその prefix が付く
-- `./blog` の実装本体は `blogcmd/` の独立 Go module。`./blog build` で `blogcmd/bin/blogcmd` をビルドし、それ以外の `./blog ...` は `blogcmd/bin/blogcmd` へそのまま渡す
-- `stg` / `prd` は dev VM で `./blog {stg|prd} image build-push` により `go` / `nginx` / `ssr` / `migration` / `seed` image を build + push し、実行環境では `./blog {stg|prd} deploy` と `./blog {stg|prd} migrate up` で pull + run する。実行環境には repo 全体ではなく、`blog`, `blogcmd/bin/blogcmd`, `docker-compose.<env>.yml`, `backend/.env.<env>`, `frontend/.env`, `cloudflared/config.<env>.yml` など必要ファイルだけを既存 path のまま配置する。image は `ghcr.io/kamiy2743/blog/{go,nginx,ssr,migration,seed}:<env>` 固定
+- `./blog` の実装本体は `blogcmd/` の独立 Go module。`./blog buildcmd` で `blogcmd/bin/blogcmd` をビルドし、それ以外の `./blog ...` は `blogcmd/bin/blogcmd` へそのまま渡す
+- `stg` / `prd` の image は `ghcr.io/kamiy2743/blog/{go,nginx,ssr,migration,seed}:<env>` 固定。`./blog {stg|prd} deploy` は dev マシンで build + push し、stg は同一 dev マシンで pull + up、prd は `eq14-prd` へ SSH して `/opt/blog` へ必要ファイル、`/etc/blog/secrets` へ secret を同期してから pull + up する
+- prd の `/etc/blog/secrets` は Docker secrets として非 root コンテナから読まれるため、directory は辿れる権限、secret file は world-readable 相当の権限にする。secret を image へ含めないことを優先する
 - MySQL は初期化時に data directory 以外にも書き込みが発生するため、`read_only: true` にはしない
 - 記事本文 Markdown は backend domain で HTML へ変換し、sanitize 後の HTML を frontend の `{@html ...}` で表示する。Markdown 拡張や link 属性のような本文 HTML の仕様は、この変換処理側で揃える
 
@@ -96,7 +97,9 @@
 - `mcp/Dockerfile`: MCP server 用イメージ。`docker`, `docker compose`, `buildx` plugin も同梱する
 - `docker-compose.dev.yml`: 開発 compose
 - `docker-compose.stg.yml`: staging compose
+- `docker-compose.stg-build.yml`: staging image build 用 compose override
 - `docker-compose.prd.yml`: 本番 compose
+- `docker-compose.prd-build.yml`: 本番 image build 用 compose override
 - `blog`: compose ラッパ
 - `blogcmd/cmd/app/main.go`: `blogcmd` のエントリポイントと top-level dispatch。実装本体は `blogcmd/internal/` 配下に command ごとの package として置く
 - `nginx/dev.conf`: 開発 nginx 設定
@@ -112,4 +115,3 @@
 - `frontend/server/render.ts`: dev / prd 共通の Inertia SSR 描画処理
 - `frontend/server/ssr-server.ts`: 本番 SSR サーバー
 - `cloudflared/config.stg.yml`, `cloudflared/config.prd.yml`: Tunnel ingress 設定
-- `docs/prd-image-deploy.md`: dev VM で stg/prd image を build + push し、実行環境へ必要ファイルだけ配置して pull + run する手順
