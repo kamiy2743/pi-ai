@@ -75,6 +75,18 @@
 - MySQL は初期化時に data directory 以外にも書き込みが発生するため、`read_only: true` にはしない
 - 記事本文 Markdown は backend domain で HTML へ変換し、sanitize 後の HTML を frontend の `{@html ...}` で表示する。Markdown 拡張や link 属性のような本文 HTML の仕様は、この変換処理側で揃える
 
+## prd セキュリティ確認
+
+- `prd` の外形監査は host の待受、ufw、Docker publish、Cloudflare Tunnel、nginx、admin 認証、secrets、本文 sanitizer の順に見る
+- host 側は `sudo ss -ltnp` と `sudo ufw status verbose` で、外部待受が SSH だけか、ufw が `deny incoming` か、SSH 許可元が LAN など必要範囲に限定されているかを確認する
+- Docker 側は `docker ps --format 'table {{.Names}}\t{{.Ports}}\t{{.Status}}'` で、`0.0.0.0:3306`, `0.0.0.0:8000`, `0.0.0.0:80`, `0.0.0.0:443` のような host port publish がないことを確認する。`80/tcp` や `3306/tcp` だけなら expose 表示であり host 公開ではない
+- Cloudflare Tunnel は `cloudflared/config.prd.yml` で、`blog.panda-dev.net` だけが `http://nginx:8000` に向き、最後が `http_status:404` の catch-all になっていることを確認する
+- nginx 設定は image 内に含まれるため、prd では `./blog prd exec nginx nginx -T` で実際に読み込まれた設定を見る。CSP、`frame-ancestors 'none'`、`object-src 'none'`、`X-Content-Type-Options nosniff`、`Strict-Transport-Security`、`Permissions-Policy`、`Referrer-Policy`、`autoindex` 無効、不要な location 不在を確認する。`server_tokens off;` も入れる
+- `/admin` は Cloudflare Access と Go Basic Auth の二段で守る。外部から `curl -I https://blog.panda-dev.net/admin` が Access login へ 302 され、内部から `./blog prd exec nginx wget -S -O - http://go:8000/admin` が `401 Unauthorized` になることを確認する。`/admin/` や `/admin/category` など配下 path も同様に確認する
+- secrets は repo や image に含めず、prd では `/etc/blog/secrets/` から Docker secrets として渡す。Cloudflare Tunnel token、Basic Auth、MySQL password などを `.env` や compose の平文に置かない
+- 記事本文は Markdown から HTML 化して `{@html ...}` で表示するため、XSS 監査では backend domain の sanitizer と link 属性仕様を最優先で確認する
+- 公開レスポンスは `curl -I https://blog.panda-dev.net/` でセキュリティヘッダーが Cloudflare 越しにも出ていることを確認する
+
 ## 重要ファイル
 
 - `backend/cmd/app/main.go`: Go アプリのエントリポイント
